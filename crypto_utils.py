@@ -1,7 +1,7 @@
 import hmac
 import hashlib
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives import serialization
 from typing import Tuple
@@ -30,7 +30,7 @@ def load_rsa_private_key(filepath: str) -> RSAPrivateKey:
     except Exception as e:
         raise RuntimeError(f"Error loading private key: {e}")
 
-def load_rsa_public_key(filepath) -> RSAPublicKey:
+def load_rsa_public_key(filepath: str) -> RSAPublicKey:
     try:
         with open(filepath, "rb") as key_file:
             public_key = serialization.load_pem_public_key(
@@ -46,10 +46,10 @@ def load_rsa_public_key(filepath) -> RSAPublicKey:
         raise RuntimeError(f"Error loading public key: {e}")
 
 def sign_message(private_key: RSAPrivateKey, message: bytes) -> bytes:
-    """Sign a message using RSA private key."""
+    """Sign a message using RSA private key"""
     if isinstance(message, str):
         message = message.encode('utf-8')
-    
+
     return private_key.sign(
         message,
         padding.PSS(
@@ -60,10 +60,10 @@ def sign_message(private_key: RSAPrivateKey, message: bytes) -> bytes:
     )
 
 def verify_signature(public_key: RSAPublicKey, message: bytes, signature: bytes) -> bool:
-    """Verify a message signature using RSA public key."""
+    """Verify a message signature using RSA public key"""
     if isinstance(message, str):
         message = message.encode('utf-8')
-    
+
     try:
         public_key.verify(
             signature,
@@ -79,10 +79,10 @@ def verify_signature(public_key: RSAPublicKey, message: bytes, signature: bytes)
         return False
 
 def keyed_hash_encrypt(key: bytes, plaintext: bytes, nonce: bytes) -> Tuple[bytes, bytes]:
-    """Encrypt plaintext using keyed-hash HMAC with the given key and nonce."""
+    """Encrypt plaintext using keyed-hash HMAC with the given key and nonce"""
     if isinstance(plaintext, str):
         plaintext = plaintext.encode('utf-8')
-    
+
     keystream = hmac.new(key, nonce, HASH_FUNC).digest()
     padded_keystream = (keystream * (len(plaintext) // len(keystream) + 1))[:len(plaintext)] # repeat the keystream to match plaintext length
     ciphertext = bytes(a ^ b for a, b in zip(plaintext, padded_keystream))
@@ -92,7 +92,7 @@ def keyed_hash_encrypt(key: bytes, plaintext: bytes, nonce: bytes) -> Tuple[byte
     return ciphertext, mac
 
 def keyed_hash_decrypt(key: bytes, ciphertext: bytes, nonce: bytes, received_mac: bytes) -> bytes:
-    """Decrypt ciphertext using keyed-hash HMAC with the given key and nonce."""
+    """Decrypt ciphertext using keyed-hash HMAC with the given key and nonce"""
     calculated_mac = hmac.new(key, ciphertext, HASH_FUNC).digest()
     if not hmac.compare_digest(calculated_mac, received_mac):
         raise ValueError("MAC integrity check failed! Decryption aborted.")
