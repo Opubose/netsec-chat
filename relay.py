@@ -1,9 +1,11 @@
+import json
+import time
+import queue
 import socket
 import threading
-from crypto_utils import load_rsa_private_key, load_rsa_public_key, verify_signature
+from crypto_utils import load_rsa_private_key, load_rsa_public_key, verify_signature, sign_message
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from typing import Dict
-import json
 
 SERVER_IP = '127.0.0.1'
 SERVER_PORT = 8080
@@ -68,13 +70,61 @@ class RelayServer:
     
     def handle_client(self, client_socket: socket.socket) -> None:
         """Handles communication with a connected client"""
-        # TODO: implement registration protocol with signed timestamp challenge-response auth
-        # TODO: everything else
-        pass
+
+        ## registration protocol
+        msg = json.loads(client_socket.recv(1024).decode('utf-8'))
+
+        client_id = msg['payload']['sender']
         
-    def relay_message(self, data: bytes) -> None:
-        # TODO: implement message relaying
-        pass
+        # verify against replay with timestamp
+        if (round(time.time(), -1) != round(msg['payload']['timestamp'], -1)):
+            print(f"Timestamp of client {client_id} is wrong - this message is old.")
+            return
+        
+        # verify the signature
+        if (not verify_signature(self.known_public_keys[client_id],  json.dumps(msg['payload']), msg['signature'])):
+            print(f"Message cannot be verified to be from {client_id}.")
+            return
+
+        # once tests are passed, send auth to client
+        data = { "recipient": client_id, "timestamp": time.time() }
+
+        msg = json.dumps({
+            "type": "registration",
+            "payload": data,
+            "signature": sign_message(self.private_key, json.dumps(data))
+        }).encode('utf-8')
+
+        client_socket.sendall(msg)
+
+        # create queue for relaying messages
+        self.active_connections[client_id] = queue.Queue()
+
+        # stop waiting to recieve messages
+        client_socket.setblocking(0)
+        
+        # now relay messages
+        while True: 
+            try:
+                msg = client_socket.recv(1024)
+                recipient = json.loads(msg.decode('utf-8'))['recipient']
+                # lock before accessing queue
+                with self.connection_lock:
+                    self.active_connections[recipient].put(msg)
+            except: 
+                continue
+            finally:
+                # lock before accessing queue
+                with self.connection_lock:
+                    if (not self.active_connections[client_id].empty()):
+                        self.relay_message(client_socket, self.active_connections[client_id].get())
+
+       
+         
+        
+    def relay_message(self, client_socket, data: bytes) -> None:
+        client_socket.sendall(data)
+        
 
 if __name__ == "__main__":
     relay_server = RelayServer(SERVER_IP, SERVER_PORT)

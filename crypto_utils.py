@@ -1,5 +1,6 @@
 import hmac
 import hashlib
+import base64
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
@@ -50,20 +51,23 @@ def sign_message(private_key: RSAPrivateKey, message: bytes) -> bytes:
     if isinstance(message, str):
         message = message.encode('utf-8')
 
-    return private_key.sign(
+    signature = private_key.sign(
         message,
         padding.PSS(
             mgf=padding.MGF1(hashes.SHA256()),
             salt_length=padding.PSS.MAX_LENGTH
         ),
         hashes.SHA256()
-    )
+        )
+    return base64.b64encode(signature).decode('utf-8')
+    
 
 def verify_signature(public_key: RSAPublicKey, message: bytes, signature: bytes) -> bool:
     """Verify a message signature using RSA public key"""
     if isinstance(message, str):
         message = message.encode('utf-8')
 
+    signature = base64.b64decode(signature.encode('utf-8'))
     try:
         public_key.verify(
             signature,
