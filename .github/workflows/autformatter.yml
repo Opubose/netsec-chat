@@ -1,0 +1,44 @@
+name: Autoformat with Black
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 
+        
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.12' 
+
+    - name: Install Black
+      run: |
+        python -m pip install --upgrade pip
+        pip install black
+
+    - name: Run Black formatter
+      id: black_check
+      run: |
+        black . || exit 0
+
+    - name: Commit changes
+      if: always()
+      run: |
+        if [[ $(git diff --stat) != '' ]]; then
+          echo "Changes found by Black. Committing..."
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add '*.py' 
+          git commit -m 'Autoformat code with Black'
+          git push
+        else
+          echo "No changes detected by Black."
+        fi
