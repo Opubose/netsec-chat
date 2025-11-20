@@ -7,8 +7,9 @@ Run this before starting the main application to ensure RSA keys are available f
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 
-PRINCIPALS = ['alice', 'bob', 'relay']
+PRINCIPALS = ["alice", "bob", "relay"]
 KEY_SIZE = 2048
+
 
 def generate_keys():
     for principal in PRINCIPALS:
@@ -29,7 +30,7 @@ def generate_keys():
                 private_key.private_bytes(
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.NoEncryption()
+                    encryption_algorithm=serialization.NoEncryption(),
                 )
             )
         # Write public key file for this principal
@@ -42,6 +43,7 @@ def generate_keys():
             )
 
     print("All keys should be generated now! You can start the main application.")
+
 
 if __name__ == "__main__":
     generate_keys()
