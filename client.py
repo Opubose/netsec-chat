@@ -299,13 +299,12 @@ class Alice(RelayClient):
 
         print(f"[{self.name}] Starting session establishment with {self.recipient}")
 
-        # Generate Diffie-Hellman private key
         print(f"[{self.name}] Generating my DH private key")
         priv_key: int = generate_dh_private_key()
         pub_key: int = compute_dh_public_key(priv_key)
         print(f"[{self.name}] Computed my DH public key g^a mod p = {pub_key}")
 
-        # Sign the DH public key for authentication
+        # i think we forgot to do this before..................... x1
         print(f"[{self.name}] Signing my DH public key with my RSA private key")
         pubkey_bytes: bytes = str(pub_key).encode("utf-8")
         signature: str = sign_message(self.private_key, pubkey_bytes)
@@ -323,7 +322,7 @@ class Alice(RelayClient):
         bob_signature: str = msg["payload"]["signature"]
         print(f"[{self.name}] Received {self.recipient}'s DH public key = {bob_pubkey}")
 
-        # Verify Bob's signature
+        # i think we forgot to do this before..................... x2
         print(
             f"[{self.name}] Verifying {self.recipient}'s signature against their DH public key"
         )
@@ -368,7 +367,6 @@ class Bob(RelayClient):
             f"[{self.name}] Received connection request from {sender} with DH public key {peer_pubkey}"
         )
 
-        # Verify Alice's signature
         print(
             f"[{self.name}] Verifying {sender}'s signature against their DH public key"
         )
@@ -384,7 +382,6 @@ class Bob(RelayClient):
 
         print(f"[{self.name}] {sender}'s signature verified successfully")
 
-        # Generate our own DH key pair
         print(f"[{self.name}] Generating my DH private key")
         priv_key: int = generate_dh_private_key()
         pub_key: int = compute_dh_public_key(priv_key)
@@ -394,14 +391,14 @@ class Bob(RelayClient):
         self.session_key = compute_dh_shared_secret(peer_pubkey, priv_key)
         print(f"[{self.name}] Session key established: {self.session_key.hex()}\n")
 
-        # Sign our DH public key for authentication
+        # i think we forgot to do this before.......................... x3
         print(f"[{self.name}] Signing my DH public key with my RSA private key")
         pubkey_bytes: bytes = str(pub_key).encode("utf-8")
         signature: str = sign_message(self.private_key, pubkey_bytes)
 
-        # Set recipient before sending
-        self.recipient = sender
+        self.recipient = sender # probably important step
 
+        # i think we forgot to do this before..................... x4
         print(f"[{self.name}] Sending authenticated DH public key to {self.recipient}")
         self._send_json(
             {"pubkey": pub_key, "signature": signature},
