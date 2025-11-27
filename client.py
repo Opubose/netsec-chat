@@ -396,7 +396,7 @@ class Bob(RelayClient):
         pubkey_bytes: bytes = str(pub_key).encode("utf-8")
         signature: str = sign_message(self.private_key, pubkey_bytes)
 
-        self.recipient = sender # probably important step
+        self.recipient = sender  # probably important step
 
         # i think we forgot to do this before..................... x4
         print(f"[{self.name}] Sending authenticated DH public key to {self.recipient}")
