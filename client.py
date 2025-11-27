@@ -28,7 +28,9 @@ HOSTS: List[str] = [
 
 class RelayClient:
     def __init__(self, name: str) -> None:
-        self.client_socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket: socket.socket = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM
+        )
         self.name: str = name
         self.recipient: Optional[str] = None
         self.send_counter: int = 0
@@ -37,7 +39,9 @@ class RelayClient:
         self.running: bool = True
 
         print(f"[{name}] Loading my private key")
-        self.private_key: RSAPrivateKey = load_rsa_private_key(f"{name}_private_key.pem")
+        self.private_key: RSAPrivateKey = load_rsa_private_key(
+            f"{name}_private_key.pem"
+        )
         if not self.private_key:
             raise RuntimeError(f"Failed to load {name}'s private key!")
 
@@ -48,7 +52,9 @@ class RelayClient:
         try:
             self.client_socket.connect((SERVER_IP, SERVER_PORT))
         except ConnectionRefusedError:
-            print(f"[{self.name}] Failed to connect to relay. Are you sure it's running?")
+            print(
+                f"[{self.name}] Failed to connect to relay. Are you sure it's running?"
+            )
             sys.exit(1)
 
         print(f"[{name}] Starting registration protocol")
@@ -82,7 +88,7 @@ class RelayClient:
             {
                 "type": "registration",
                 "payload": registration_data,
-                "signature": signature
+                "signature": signature,
             }
         ).encode("utf-8")
 
@@ -91,7 +97,9 @@ class RelayClient:
 
         print(f"[{self.name}] Waiting for relay authentication response")
         try:
-            response: Dict[str, Any] = json.loads(self.client_socket.recv(1024).decode("utf-8"))
+            response: Dict[str, Any] = json.loads(
+                self.client_socket.recv(1024).decode("utf-8")
+            )
         except Exception:
             print(f"[{self.name}] Registration failed (no response)")
             return False
@@ -114,7 +122,9 @@ class RelayClient:
         print(f"[{self.name}] Relay authenticated successfully")
         return True
 
-    def _send_json(self, payload: Dict[str, Any], recipient: str, msg_type: str = "message") -> None:
+    def _send_json(
+        self, payload: Dict[str, Any], recipient: str, msg_type: str = "message"
+    ) -> None:
         """Helper function for making and sending jsons via relay."""
         packet: bytes = json.dumps(
             {
@@ -126,13 +136,13 @@ class RelayClient:
         ).encode("utf-8")
 
         self.client_socket.sendall(packet)
-    
+
     def secure_send(self, message: str, recipient: str) -> None:
         """Encrypts and sends a message using the session key."""
         if not self.session_key:
             print(f"[{self.name}] Error: no session key established yet!")
             return
-        
+
         nonce: bytes = str(self.send_counter).encode("utf-8")
         plaintext: bytes = f"{message}|{self.send_counter}".encode("utf-8")
 
@@ -140,10 +150,7 @@ class RelayClient:
         mac: bytes
         ciphertext, mac = keyed_hash_encrypt(self.session_key, plaintext, nonce)
 
-        payload: Dict[str, str] = {
-            "ciphertext": ciphertext.hex(),
-            "mac": mac.hex()
-        }
+        payload: Dict[str, str] = {"ciphertext": ciphertext.hex(), "mac": mac.hex()}
 
         self._send_json(payload, recipient, msg_type="message")
         self.send_counter += 1
@@ -152,7 +159,9 @@ class RelayClient:
         """For the chat send loop."""
         self.recipient = recipient
         print(f"[{self.name}] Secure session established with {self.recipient}")
-        print(f"[{self.name}] Enter your messages below :D, or type \"exit chat\" to quit :(\n")
+        print(
+            f'[{self.name}] Enter your messages below :D, or type "exit chat" to quit :(\n'
+        )
 
         receive_thread: threading.Thread = threading.Thread(target=self.receive_loop)
         receive_thread.daemon = True
@@ -173,14 +182,14 @@ class RelayClient:
                 sys.stdout.write(f"\033[F\033[K")
                 print(f"[Me]: {msg}")
                 self.secure_send(msg, recipient)
-            
+
             except KeyboardInterrupt:
                 self.running = False
                 break
             except Exception as e:
                 print(f"[{self.name}] Error encountered while sending message: {e}")
                 break
-    
+
     def receive_loop(self) -> None:
         """Incoming message listener loop."""
         while self.running:
@@ -195,7 +204,9 @@ class RelayClient:
 
                 if "ciphertext" in payload:
                     if not self.session_key:
-                        print(f"[{self.name}] Error: Received encrypted message but no session key!")
+                        print(
+                            f"[{self.name}] Error: Received encrypted message but no session key!"
+                        )
                         continue
 
                     ciphertext: bytes = bytes.fromhex(payload["ciphertext"])
@@ -212,34 +223,57 @@ class RelayClient:
                         msg, counter_str = plaintext.rsplit("|", 1)
 
                         if int(counter_str) != self.receive_counter:
-                            print(f"[{self.name}] Warning!!! Replay or out-of-order attack detected :O", file=sys.stderr)
-                            print(f"[{self.name}] Expected counter {self.receive_counter}, got {counter_str}", file=sys.stderr)
-                            print(f"[{self.name}] Terminating this chat immediately for security. Sorry about that.", file=sys.stderr)
+                            print(
+                                f"[{self.name}] Warning!!! Replay or out-of-order attack detected :O",
+                                file=sys.stderr,
+                            )
+                            print(
+                                f"[{self.name}] Expected counter {self.receive_counter}, got {counter_str}",
+                                file=sys.stderr,
+                            )
+                            print(
+                                f"[{self.name}] Terminating this chat immediately for security. Sorry about that.",
+                                file=sys.stderr,
+                            )
                             self.running = False
                             self.client_socket.close()
                             break
                         else:
                             print(f"[{sender}]: {msg}")
                             self.receive_counter += 1
-                    
+
                     except ValueError as ve:
-                        print(f"[{self.name}] Warning!!! MAC integrity check failed from {sender}!", file=sys.stderr)
-                        print(f"[{self.name}] Message may have been tampered with: {ve}", file=sys.stderr)
-                        print(f"[{self.name}] Terminating this chat immediately for security. Sorry about that.", file=sys.stderr)
+                        print(
+                            f"[{self.name}] Warning!!! MAC integrity check failed from {sender}!",
+                            file=sys.stderr,
+                        )
+                        print(
+                            f"[{self.name}] Message may have been tampered with: {ve}",
+                            file=sys.stderr,
+                        )
+                        print(
+                            f"[{self.name}] Terminating this chat immediately for security. Sorry about that.",
+                            file=sys.stderr,
+                        )
                         self.running = False
                         self.client_socket.close()
                         break
                     except Exception as e:
-                        print(f"[{self.name}] ERROR: Decryption error: {e}", file=sys.stderr)
+                        print(
+                            f"[{self.name}] ERROR: Decryption error: {e}",
+                            file=sys.stderr,
+                        )
                         break
-            
+
             except ConnectionResetError:
                 print(f"[{self.name}] ERROR: Connection lost.", file=sys.stderr)
                 print(f"[{self.name}] Terminating session.", file=sys.stderr)
                 self.running = False
                 break
             except json.JSONDecodeError as e:
-                print(f"[{self.name}] ERROR: Invalid JSON received: {e}", file=sys.stderr)
+                print(
+                    f"[{self.name}] ERROR: Invalid JSON received: {e}", file=sys.stderr
+                )
                 print(f"[{self.name}] Terminating session.", file=sys.stderr)
                 self.running = False
                 break
@@ -257,7 +291,7 @@ class Alice(RelayClient):
         """Start communication with the specified recipient."""
         self.recipient = recipient
         self.start_messages()
-    
+
     def start_messages(self) -> None:
         """Exchange messages with Bob using authenticated Diffie-Hellman."""
         if not self.recipient:
@@ -278,9 +312,9 @@ class Alice(RelayClient):
 
         print(f"[{self.name}] Sending authenticated DH public key to {self.recipient}")
         self._send_json(
-            {"pubkey": pub_key, "signature": signature}, 
-            self.recipient, 
-            msg_type="handshake"
+            {"pubkey": pub_key, "signature": signature},
+            self.recipient,
+            msg_type="handshake",
         )
 
         print(f"[{self.name}] Waiting for {self.recipient}'s DH public key...")
@@ -290,19 +324,19 @@ class Alice(RelayClient):
         print(f"[{self.name}] Received {self.recipient}'s DH public key = {bob_pubkey}")
 
         # Verify Bob's signature
-        print(f"[{self.name}] Verifying {self.recipient}'s signature against their DH public key")
+        print(
+            f"[{self.name}] Verifying {self.recipient}'s signature against their DH public key"
+        )
         bob_pubkey_bytes: bytes = str(bob_pubkey).encode("utf-8")
         if not verify_signature(
-            self.known_public_keys[self.recipient],
-            bob_pubkey_bytes,
-            bob_signature
+            self.known_public_keys[self.recipient], bob_pubkey_bytes, bob_signature
         ):
             raise RuntimeError(
                 f"[{self.name}] Warning!!! {self.recipient}'s DH public key signature verification failed!\n"
                 "Potential MITM attack detected.\n"
                 "Terminating this chat immediately for security. Sorry about that."
             )
-        
+
         print(f"[{self.name}] {self.recipient}'s signature verified successfully")
 
         print(f"[{self.name}] Computing shared session key")
@@ -329,23 +363,25 @@ class Bob(RelayClient):
         sender: str = msg["sender"]
         peer_pubkey: int = msg["payload"]["pubkey"]
         peer_signature: str = msg["payload"]["signature"]
-        
-        print(f"[{self.name}] Received connection request from {sender} with DH public key {peer_pubkey}")
+
+        print(
+            f"[{self.name}] Received connection request from {sender} with DH public key {peer_pubkey}"
+        )
 
         # Verify Alice's signature
-        print(f"[{self.name}] Verifying {sender}'s signature against their DH public key")
+        print(
+            f"[{self.name}] Verifying {sender}'s signature against their DH public key"
+        )
         peer_pubkey_bytes: bytes = str(peer_pubkey).encode("utf-8")
         if not verify_signature(
-            self.known_public_keys[sender],
-            peer_pubkey_bytes,
-            peer_signature
+            self.known_public_keys[sender], peer_pubkey_bytes, peer_signature
         ):
             raise RuntimeError(
                 f"[{self.name}] Warning!!! {self.recipient}'s DH public key signature verification failed!\n"
                 "Potential MITM attack detected.\n"
                 "Terminating this chat immediately for security. Sorry about that."
             )
-        
+
         print(f"[{self.name}] {sender}'s signature verified successfully")
 
         # Generate our own DH key pair
@@ -365,12 +401,12 @@ class Bob(RelayClient):
 
         # Set recipient before sending
         self.recipient = sender
-        
+
         print(f"[{self.name}] Sending authenticated DH public key to {self.recipient}")
         self._send_json(
-            {"pubkey": pub_key, "signature": signature}, 
-            self.recipient, 
-            msg_type="handshake"
+            {"pubkey": pub_key, "signature": signature},
+            self.recipient,
+            msg_type="handshake",
         )
 
         # Now can send regular messages
@@ -381,14 +417,14 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python3 client.py [alice|bob]")
         sys.exit(1)
-    
+
     role: str = sys.argv[1].strip().lower()
 
     if role == "alice":
         client_handler = Alice()
         client_handler.start("bob")
     elif role == "bob":
-        client_handler  = Bob()
+        client_handler = Bob()
         client_handler.start()
     else:
         print("Usage: python3 client.py [alice|bob]")
