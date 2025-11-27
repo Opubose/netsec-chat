@@ -5,7 +5,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey, RSAPublicKey
 from cryptography.hazmat.primitives import serialization
-from typing import Tuple
+from typing import Tuple, Union
 
 HASH_FUNC = hashlib.sha256
 
@@ -53,7 +53,7 @@ def load_rsa_public_key(filepath: str) -> RSAPublicKey:
         raise RuntimeError(f"Error loading public key: {e}")
 
 
-def sign_message(private_key: RSAPrivateKey, message: bytes) -> bytes:
+def sign_message(private_key: RSAPrivateKey, message: Union[str, bytes]) -> str:
     """Sign a message using RSA private key"""
     if isinstance(message, str):
         message = message.encode("utf-8")
@@ -69,16 +69,20 @@ def sign_message(private_key: RSAPrivateKey, message: bytes) -> bytes:
 
 
 def verify_signature(
-    public_key: RSAPublicKey, message: bytes, signature: bytes
+    public_key: RSAPublicKey, message: Union[str, bytes], signature: Union[str, bytes]
 ) -> bool:
     """Verify a message signature using RSA public key"""
     if isinstance(message, str):
         message = message.encode("utf-8")
 
-    signature = base64.b64decode(signature.encode("utf-8"))
+    if isinstance(signature, str):
+        sig_bytes = base64.b64decode(signature.encode("utf-8"))
+    else:
+        sig_bytes = base64.b64decode(signature)
+
     try:
         public_key.verify(
-            signature,
+            sig_bytes,
             message,
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH
