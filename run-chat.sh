@@ -1,7 +1,7 @@
 #!/bin/bash
 
 tmux kill-session -t chat 2>/dev/null
-rm -f .chat.lock
+rm -f /tmp/netsec-chat.lock
 
 if [[ ! -e ./relay_private_key.pem ]]; then
     python3 keygen.py
