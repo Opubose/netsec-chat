@@ -80,7 +80,7 @@ class RelayServer:
         msg: Dict[str, Any] = json.loads(client_socket.recv(1024).decode("utf-8"))
 
         client_id: str = msg["payload"]["sender"]
-        print("[relay] Registration request from client: {client_id}")
+        print(f"[relay] Registration request from client: {client_id}")
 
         # verify against replay with timestamp
         print("[relay] Verifying timestamp...")
