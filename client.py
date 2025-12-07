@@ -352,7 +352,9 @@ class Alice(RelayClient):
             )
         bob_pubkey: int = msg["payload"]["pubkey"]
         bob_signature: str = msg["signature"]
-        print(f"[{self.name}] Received {self.recipient}'s DH public key = {hex(bob_pubkey)}")
+        print(
+            f"[{self.name}] Received {self.recipient}'s DH public key = {hex(bob_pubkey)}"
+        )
 
         # i think we forgot to do this before..................... x2
         print(
