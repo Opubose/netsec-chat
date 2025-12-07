@@ -77,7 +77,7 @@ class RelayServer:
 
         """ registration protocol """
         print("[relay] Receiving registration request")
-        msg: Dict[str, Any] = json.loads(client_socket.recv(1024).decode("utf-8"))
+        msg: Dict[str, Any] = json.loads(client_socket.recv(4096).decode("utf-8"))
 
         client_id: str = msg["payload"]["sender"]
         print(f"[relay] Registration request from client: {client_id}")
@@ -125,7 +125,7 @@ class RelayServer:
         """ Relay between the clients """
         while True:
             try:
-                raw_msg: bytes = client_socket.recv(1024)
+                raw_msg: bytes = client_socket.recv(4096)
                 if not raw_msg:
                     print(f"[relay] Client {client_id} closed the connection.\n")
                     self.end_client_session(client_id)
