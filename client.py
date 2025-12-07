@@ -25,7 +25,7 @@ HOSTS: List[str] = [
     "bob",
     "relay",
 ]  # assumption: client "knows" everyone's identifiers (names in this case)
-LOCK_FILE = ".chat.lock"    # lock file to prevent multiple instances of bob
+LOCK_FILE = ".chat.lock"  # lock file to prevent multiple instances of bob
 
 
 class RelayClient:
@@ -442,7 +442,7 @@ if __name__ == "__main__":
 
         with open(LOCK_FILE, "w") as f:
             f.write("locked and running!")
-        
+
         try:
             client_handler = Bob()
             client_handler.start()
