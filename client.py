@@ -132,7 +132,7 @@ class RelayClient:
                 "recipient": recipient,
                 "type": msg_type,
                 "payload": payload,
-                "signature": sign_message(self.private_key, json.dumps(payload))
+                "signature": sign_message(self.private_key, json.dumps(payload)),
             }
         ).encode("utf-8")
 
@@ -265,8 +265,8 @@ class RelayClient:
                             file=sys.stderr,
                         )
                         break
-                elif sender == 'relay':
-                    ''' if recipient disconnects, relay notifies the client. '''
+                elif sender == "relay":
+                    """if recipient disconnects, relay notifies the client."""
                     # re-authenticate server message
                     if not verify_signature(
                         self.known_public_keys["relay"],
@@ -285,7 +285,7 @@ class RelayClient:
                     else:
                         print(f"[{self.name}] {self.recipient} has disconnected.")
                     self.running = False
-                    
+
                     break
             except ConnectionResetError:
                 print(f"[{self.name}] ERROR: Connection lost.", file=sys.stderr)
@@ -339,7 +339,7 @@ class Alice(RelayClient):
         msg: Dict[str, Any] = json.loads(self.client_socket.recv(1024).decode("utf-8"))
         # terminate if not connected
 
-        if msg["sender"] == 'relay':
+        if msg["sender"] == "relay":
             raise RuntimeError(
                 f"[{self.name}] {self.recipient} is not currently connected.\n"
                 "Ending session."
@@ -352,7 +352,7 @@ class Alice(RelayClient):
         print(
             f"[{self.name}] Verifying {self.recipient}'s signature against their DH public key"
         )
-        bob_pubkey_bytes: bytes = json.dumps(msg["payload"]).encode('utf-8')
+        bob_pubkey_bytes: bytes = json.dumps(msg["payload"]).encode("utf-8")
         if not verify_signature(
             self.known_public_keys[self.recipient], bob_pubkey_bytes, bob_signature
         ):

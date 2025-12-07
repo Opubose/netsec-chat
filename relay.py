@@ -20,6 +20,7 @@ CLIENTS = [
     "bob",
 ]  # assumption: server "knows" the clients' identifiers (names in this case)
 
+
 class RelayServer:
     def __init__(self, host: str, port: int):
         self.host = host
@@ -42,7 +43,9 @@ class RelayServer:
         public_keys = {}
         for client in CLIENTS:
             try:
-                public_key: RSAPublicKey = load_rsa_public_key(f"{client}_public_key.pem")
+                public_key: RSAPublicKey = load_rsa_public_key(
+                    f"{client}_public_key.pem"
+                )
                 public_keys[client] = public_key
             except Exception as e:
                 print(f"[relay] Error loading public key for {client}: {e}")
@@ -71,8 +74,8 @@ class RelayServer:
 
     def handle_client(self, client_socket: socket.socket) -> None:
         """Handles communication with a connected client"""
-        
-        ''' registration protocol '''
+
+        """ registration protocol """
         print("[relay] Receiving registration request")
         msg: Dict[str, Any] = json.loads(client_socket.recv(1024).decode("utf-8"))
 
@@ -118,12 +121,12 @@ class RelayServer:
 
         # stop waiting to recieve messages
         client_socket.setblocking(False)
-        
-        ''' Relay between the clients '''
+
+        """ Relay between the clients """
         while True:
             try:
                 raw_msg: bytes = client_socket.recv(1024)
-                if not raw_msg: 
+                if not raw_msg:
                     print(f"[relay] Client {client_id} closed the connection.\n")
                     self.end_client_session(client_id)
                     break
@@ -131,11 +134,19 @@ class RelayServer:
                 msg_data: Dict[str, Any] = json.loads(raw_msg.decode("utf-8"))
                 recipient: str = msg_data["recipient"]
                 sender: str = msg_data["sender"]
-                
-                ''' authenticate the message before relaying. '''
-                ''' replay attacks are handled in the client. '''
-                if (sender != client_id) or (not verify_signature(client_key, json.dumps(msg_data["payload"]), msg_data["signature"])):
-                    print(f"[relay] Warning: message from {client_id} could not be authenticated! Rejecting...")
+
+                """ authenticate the message before relaying. """
+                """ replay attacks are handled in the client. """
+                if (sender != client_id) or (
+                    not verify_signature(
+                        client_key,
+                        json.dumps(msg_data["payload"]),
+                        msg_data["signature"],
+                    )
+                ):
+                    print(
+                        f"[relay] Warning: message from {client_id} could not be authenticated! Rejecting..."
+                    )
                     continue
 
                 # lock before accessing queue to prevent thread issues
@@ -147,39 +158,52 @@ class RelayServer:
                         print(
                             f"[relay] Warning: {recipient} is not connected but {sender} is trying to send them a message! Rejecting..."
                         )
-                        # send error message to client 
-                        msg: Dict[str, str] = {'message': "{recipient} is not connected.", 'timestamp': time.time()}
-                        client_socket.sendall(json.dumps({
-                            'sender': "relay", 
-                            'recipient': client_id, 
-                            'payload': msg,
-                            'signature': sign_message(self.private_key, json.dumps(msg).encode('utf-8'))
-                        }).encode('utf-8'))
-            except BlockingIOError: 
+                        # send error message to client
+                        msg: Dict[str, str] = {
+                            "message": "{recipient} is not connected.",
+                            "timestamp": time.time(),
+                        }
+                        client_socket.sendall(
+                            json.dumps(
+                                {
+                                    "sender": "relay",
+                                    "recipient": client_id,
+                                    "payload": msg,
+                                    "signature": sign_message(
+                                        self.private_key,
+                                        json.dumps(msg).encode("utf-8"),
+                                    ),
+                                }
+                            ).encode("utf-8")
+                        )
+            except BlockingIOError:
                 # timeout error (no messages)
                 pass
             except json.JSONDecodeError as e:
                 print(
-                    f"[relay] ERROR: Invalid JSON received from {client_id}: {e}\n", file=sys.stderr
+                    f"[relay] ERROR: Invalid JSON received from {client_id}: {e}\n",
+                    file=sys.stderr,
                 )
                 self.end_client_session(client_id)
                 break
 
-            except ConnectionResetError: 
-                print(f"[relay] ERROR: Connection lost to {client_id}.\n", file=sys.stderr)
+            except ConnectionResetError:
+                print(
+                    f"[relay] ERROR: Connection lost to {client_id}.\n", file=sys.stderr
+                )
                 self.end_client_session(client_id)
                 break
-                
-            ''' get message from queue each round and send it '''
+
+            """ get message from queue each round and send it """
             with self.connection_lock:
                 if not self.active_connections[client_id].empty():
                     client_socket.sendall(self.active_connections[client_id].get())
-                    
+
     def relay_message(self, client_socket: socket.socket, data: bytes) -> None:
         client_socket.sendall(data)
 
     def end_client_session(self, client: str) -> None:
-        """ remove client from active connection list. """
+        """remove client from active connection list."""
         with self.connection_lock:
             del self.active_connections[client]
 
