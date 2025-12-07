@@ -4,6 +4,7 @@ import socket
 import threading
 import sys
 import os
+from tempfile import gettempdir
 from crypto_utils import (
     load_rsa_private_key,
     load_rsa_public_key,
@@ -25,8 +26,8 @@ HOSTS: List[str] = [
     "bob",
     "relay",
 ]  # assumption: client "knows" everyone's identifiers (names in this case)
-LOCK_FILE = ".chat.lock"  # lock file to prevent multiple instances of bob
-
+# LOCK_FILE = ".chat.lock"  # lock file to prevent multiple instances of bob
+LOCK_FILE = os.path.join(gettempdir(), "netsec-chat.lock")  # lock file to prevent multiple instances of bob
 
 class RelayClient:
     def __init__(self, name: str) -> None:
