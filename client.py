@@ -132,6 +132,7 @@ class RelayClient:
                 "recipient": recipient,
                 "type": msg_type,
                 "payload": payload,
+                "signature": sign_message(self.private_key, json.dumps(payload))
             }
         ).encode("utf-8")
 
@@ -264,7 +265,28 @@ class RelayClient:
                             file=sys.stderr,
                         )
                         break
-
+                elif sender == 'relay':
+                    ''' if recipient disconnects, relay notifies the client. '''
+                    # re-authenticate server message
+                    if not verify_signature(
+                        self.known_public_keys["relay"],
+                        json.dumps(payload).encode("utf-8"),
+                        data["signature"],
+                    ) or (round(time.time(), -1) != round(payload["timestamp"], -1)):
+                        print(
+                            f"[{self.name}] Status message from {sender} could not be authenticated!",
+                            file=sys.stderr,
+                        )
+                        print(
+                            f"[{self.name}] Terminating this chat immediately for security. Sorry about that.",
+                            file=sys.stderr,
+                        )
+                        self.client_socket.close()
+                    else:
+                        print(f"[{self.name}] {self.recipient} has disconnected.")
+                    self.running = False
+                    
+                    break
             except ConnectionResetError:
                 print(f"[{self.name}] ERROR: Connection lost.", file=sys.stderr)
                 print(f"[{self.name}] Terminating session.", file=sys.stderr)
@@ -304,29 +326,33 @@ class Alice(RelayClient):
         pub_key: int = compute_dh_public_key(priv_key)
         print(f"[{self.name}] Computed my DH public key g^a mod p = {pub_key}")
 
-        # i think we forgot to do this before..................... x1
+        # send message with verification (signature computed in sending)
         print(f"[{self.name}] Signing my DH public key with my RSA private key")
-        pubkey_bytes: bytes = str(pub_key).encode("utf-8")
-        signature: str = sign_message(self.private_key, pubkey_bytes)
-
         print(f"[{self.name}] Sending authenticated DH public key to {self.recipient}")
         self._send_json(
-            {"pubkey": pub_key, "signature": signature},
+            {"pubkey": pub_key},
             self.recipient,
             msg_type="handshake",
         )
 
         print(f"[{self.name}] Waiting for {self.recipient}'s DH public key...")
         msg: Dict[str, Any] = json.loads(self.client_socket.recv(1024).decode("utf-8"))
+        # terminate if not connected
+
+        if msg["sender"] == 'relay':
+            raise RuntimeError(
+                f"[{self.name}] {self.recipient} is not currently connected.\n"
+                "Ending session."
+            )
         bob_pubkey: int = msg["payload"]["pubkey"]
-        bob_signature: str = msg["payload"]["signature"]
+        bob_signature: str = msg["signature"]
         print(f"[{self.name}] Received {self.recipient}'s DH public key = {bob_pubkey}")
 
         # i think we forgot to do this before..................... x2
         print(
             f"[{self.name}] Verifying {self.recipient}'s signature against their DH public key"
         )
-        bob_pubkey_bytes: bytes = str(bob_pubkey).encode("utf-8")
+        bob_pubkey_bytes: bytes = json.dumps(msg["payload"]).encode('utf-8')
         if not verify_signature(
             self.known_public_keys[self.recipient], bob_pubkey_bytes, bob_signature
         ):
@@ -361,7 +387,7 @@ class Bob(RelayClient):
         msg: Dict[str, Any] = json.loads(self.client_socket.recv(1024).decode("utf-8"))
         sender: str = msg["sender"]
         peer_pubkey: int = msg["payload"]["pubkey"]
-        peer_signature: str = msg["payload"]["signature"]
+        peer_signature: str = msg["signature"]
 
         print(
             f"[{self.name}] Received connection request from {sender} with DH public key {peer_pubkey}"
@@ -370,7 +396,7 @@ class Bob(RelayClient):
         print(
             f"[{self.name}] Verifying {sender}'s signature against their DH public key"
         )
-        peer_pubkey_bytes: bytes = str(peer_pubkey).encode("utf-8")
+        peer_pubkey_bytes: bytes = json.dumps(msg["payload"]).encode("utf-8")
         if not verify_signature(
             self.known_public_keys[sender], peer_pubkey_bytes, peer_signature
         ):
@@ -391,17 +417,15 @@ class Bob(RelayClient):
         self.session_key = compute_dh_shared_secret(peer_pubkey, priv_key)
         print(f"[{self.name}] Session key established: {self.session_key.hex()}\n")
 
-        # i think we forgot to do this before.......................... x3
+        # signs in message
         print(f"[{self.name}] Signing my DH public key with my RSA private key")
-        pubkey_bytes: bytes = str(pub_key).encode("utf-8")
-        signature: str = sign_message(self.private_key, pubkey_bytes)
 
         self.recipient = sender  # probably important step
 
         # i think we forgot to do this before..................... x4
         print(f"[{self.name}] Sending authenticated DH public key to {self.recipient}")
         self._send_json(
-            {"pubkey": pub_key, "signature": signature},
+            {"pubkey": pub_key},
             self.recipient,
             msg_type="handshake",
         )
