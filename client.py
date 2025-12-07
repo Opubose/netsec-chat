@@ -3,6 +3,7 @@ import time
 import socket
 import threading
 import sys
+import os
 from crypto_utils import (
     load_rsa_private_key,
     load_rsa_public_key,
@@ -24,6 +25,7 @@ HOSTS: List[str] = [
     "bob",
     "relay",
 ]  # assumption: client "knows" everyone's identifiers (names in this case)
+LOCK_FILE = ".chat.lock"    # lock file to prevent multiple instances of bob
 
 
 class RelayClient:
@@ -98,7 +100,7 @@ class RelayClient:
         print(f"[{self.name}] Waiting for relay authentication response")
         try:
             response: Dict[str, Any] = json.loads(
-                self.client_socket.recv(1024).decode("utf-8")
+                self.client_socket.recv(4096).decode("utf-8")
             )
         except Exception:
             print(f"[{self.name}] Registration failed (no response)")
@@ -336,7 +338,7 @@ class Alice(RelayClient):
         )
 
         print(f"[{self.name}] Waiting for {self.recipient}'s DH public key...")
-        msg: Dict[str, Any] = json.loads(self.client_socket.recv(1024).decode("utf-8"))
+        msg: Dict[str, Any] = json.loads(self.client_socket.recv(4096).decode("utf-8"))
         # terminate if not connected
 
         if msg["sender"] == "relay":
@@ -384,7 +386,7 @@ class Bob(RelayClient):
         """Exchange messages with Alice using authenticated Diffie-Hellman."""
         print(f"[{self.name}] Waiting for session establishment request")
 
-        msg: Dict[str, Any] = json.loads(self.client_socket.recv(1024).decode("utf-8"))
+        msg: Dict[str, Any] = json.loads(self.client_socket.recv(4096).decode("utf-8"))
         sender: str = msg["sender"]
         peer_pubkey: int = msg["payload"]["pubkey"]
         peer_signature: str = msg["signature"]
@@ -435,18 +437,20 @@ class Bob(RelayClient):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 client.py [alice|bob]")
-        sys.exit(1)
+    if not os.path.exists(LOCK_FILE):
+        print("Starting as Bob (waiting for connection)...")
 
-    role: str = sys.argv[1].strip().lower()
-
-    if role == "alice":
+        with open(LOCK_FILE, "w") as f:
+            f.write("locked and running!")
+        
+        try:
+            client_handler = Bob()
+            client_handler.start()
+        finally:
+            if os.path.exists(LOCK_FILE):
+                os.remove(LOCK_FILE)
+            print("Bob has exited and lock file removed ^_^")
+    else:
+        print("Bob is already running. Starting as Alice (initiating connection)...")
         client_handler = Alice()
         client_handler.start("bob")
-    elif role == "bob":
-        client_handler = Bob()
-        client_handler.start()
-    else:
-        print("Usage: python3 client.py [alice|bob]")
-        sys.exit(1)
