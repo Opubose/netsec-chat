@@ -26,7 +26,7 @@ HOSTS: List[str] = [
     "bob",
     "relay",
 ]  # assumption: client "knows" everyone's identifiers (names in this case)
-# LOCK_FILE = ".chat.lock"  # lock file to prevent multiple instances of bob
+
 LOCK_FILE = os.path.join(
     gettempdir(), "netsec-chat.lock"
 )  # lock file to prevent multiple instances of bob
@@ -330,7 +330,7 @@ class Alice(RelayClient):
         print(f"[{self.name}] Generating my DH private key")
         priv_key: int = generate_dh_private_key()
         pub_key: int = compute_dh_public_key(priv_key)
-        print(f"[{self.name}] Computed my DH public key g^a mod p = {pub_key}")
+        print(f"[{self.name}] Computed my DH public key g^a mod p = {hex(pub_key)}")
 
         # send message with verification (signature computed in sending)
         print(f"[{self.name}] Signing my DH public key with my RSA private key")
@@ -352,7 +352,7 @@ class Alice(RelayClient):
             )
         bob_pubkey: int = msg["payload"]["pubkey"]
         bob_signature: str = msg["signature"]
-        print(f"[{self.name}] Received {self.recipient}'s DH public key = {bob_pubkey}")
+        print(f"[{self.name}] Received {self.recipient}'s DH public key = {hex(bob_pubkey)}")
 
         # i think we forgot to do this before..................... x2
         print(
@@ -372,7 +372,7 @@ class Alice(RelayClient):
 
         print(f"[{self.name}] Computing shared session key")
         self.session_key = compute_dh_shared_secret(bob_pubkey, priv_key)
-        print(f"[{self.name}] Session key established: {self.session_key.hex()}\n")
+        print(f"[{self.name}] Session key established: 0x{self.session_key.hex()}\n")
 
         # Now that session is established, can send messages
         self.start_chat(self.recipient)
@@ -396,7 +396,7 @@ class Bob(RelayClient):
         peer_signature: str = msg["signature"]
 
         print(
-            f"[{self.name}] Received connection request from {sender} with DH public key {peer_pubkey}"
+            f"[{self.name}] Received connection request from {sender} with DH public key {hex(peer_pubkey)}"
         )
 
         print(
@@ -417,11 +417,11 @@ class Bob(RelayClient):
         print(f"[{self.name}] Generating my DH private key")
         priv_key: int = generate_dh_private_key()
         pub_key: int = compute_dh_public_key(priv_key)
-        print(f"[{self.name}] Computed my DH public key g^b mod p = {pub_key}")
+        print(f"[{self.name}] Computed my DH public key g^b mod p = {hex(pub_key)}")
 
         print(f"[{self.name}] Computing shared session key from DH")
         self.session_key = compute_dh_shared_secret(peer_pubkey, priv_key)
-        print(f"[{self.name}] Session key established: {self.session_key.hex()}\n")
+        print(f"[{self.name}] Session key established: 0x{self.session_key.hex()}\n")
 
         # signs in message
         print(f"[{self.name}] Signing my DH public key with my RSA private key")
