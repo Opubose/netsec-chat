@@ -151,9 +151,27 @@ class RelayServer:
 
                 # lock before accessing queue to prevent thread issues
                 print(f"[relay] Relaying message: {sender} -> {recipient}")
+                
+                ## Uncomment this during demo (confidentiality)
+                # print(f"[relay] Message payload: {msg_data['payload']}")
+
                 with self.connection_lock:
                     if recipient in self.active_connections:
+                        ## Uncomment this during demo (tamper attack)
+                        # data_dict = json.loads(raw_msg.decode('utf-8'))
+                        # if 'ciphertext' in data_dict['payload']:
+                        #     print("[relay] Tampering with ciphertext >:)")
+                        #     ciphertext_content = data_dict['payload']['ciphertext']
+                        #     tampered_cipher = ciphertext_content[::-1]  # simple tampering by reversing
+                        #     data_dict['payload']['ciphertext'] = tampered_cipher
+                        #     raw_msg = json.dumps(data_dict).encode('utf-8')
+
                         self.active_connections[recipient].put(raw_msg)
+
+                        ## Uncomment this during demo (replay attack)
+                        # print(f"[relay] Replaying message to {recipient} >:)")
+                        # self.active_connections[recipient].put(raw_msg)
+
                     else:
                         print(
                             f"[relay] Warning: {recipient} is not connected but {sender} is trying to send them a message! Rejecting..."
